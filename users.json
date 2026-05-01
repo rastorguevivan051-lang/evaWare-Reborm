@@ -1,0 +1,29 @@
+{
+  "8B2C381D-8CD804E5-34304ED0-28745276": {
+    "uid": 1,
+    "hwid": "8B2C381D-8CD804E5-34304ED0-28745276",
+    "name": "Ivan",
+    "mc": "evaware_224",
+    "version": "1.7",
+    "hardware": "💻 ОС: unknown\n🔲 МП: unknown\n⚙️ CPU: unknown\n🎮 GPU: unknown\n🧠 RAM: ?\n💾 Диск: ?",
+    "pc": "HOME-PC",
+    "os_user": "Credw",
+    "status": "active",
+    "launches": 3,
+    "first": "25.04.2026 20:56:38",
+    "last": "25.04.2026 21:32:06"
+  },
+  "047E0A31-15BAD0BF-B3FA7347-E3615F57": {
+    "uid": 2,
+    "hwid": "047E0A31-15BAD0BF-B3FA7347-E3615F57",
+    "name": "SocialNet",
+    "mc": "SocialNet",
+    "version": "1.7",
+    "hardware": "💻 ОС: unknown\n🔲 МП: unknown\n⚙️ CPU: unknown\n🎮 GPU: unknown\n🧠 RAM: ?\n💾 Диск: ?",
+    "pc": "HOME-PC",
+    "os_user": "Credw",
+    "status": "active",
+    "launches": 5,
+    "first": "25.04.2026 22:57:18",
+    "last": "25.04.2026 23:00:13"
+  }

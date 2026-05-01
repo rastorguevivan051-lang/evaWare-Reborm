@@ -1,0 +1,21 @@
+{
+  "FB18-DBT8-MGFV-4Q9A": {
+    "expires": "31.03.2050",
+    "created": "25.04.2026 22:55",
+    "used": true,
+    "used_by": "socialnet",
+    "used_date": "25.04.2026"
+  },
+  "HV8H-JVCI-J4BT-BPFC": {
+    "expires": "26.04.2026",
+    "created": "25.04.2026 23:03",
+    "used": false,
+    "used_by": null
+  },
+  "E5KA-M27X-1O6C-TPB6": {
+    "expires": "26.04.2026",
+    "created": "25.04.2026 23:03",
+    "used": false,
+    "used_by": null
+  }
+}
