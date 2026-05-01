@@ -139,7 +139,51 @@ def auth():
             "status": "ok",
             "uid": accounts[login].get("uid", 0),
             "group": accounts[login].get("group", "Пользователь"),
-            "subscription_end": accounts[login].get("expires", "Не куплен")
+            "expiry": accounts[login].get("expires", "Не куплен")
+        })
+    
+    # Активация ключа
+    if action == "activate_key":
+        uid = d.get("uid")
+        key = d.get("key","").upper()
+        
+        if not uid or not key:
+            return jsonify({"status": "error"})
+        
+        keys_db = load(KEYS_DB)
+        accounts = load(ACCOUNTS)
+        
+        # Проверяем существование ключа
+        if key not in keys_db:
+            return jsonify({"status": "invalid"})
+        
+        # Проверяем использован ли ключ
+        if keys_db[key].get("used"):
+            return jsonify({"status": "used"})
+        
+        # Находим пользователя по UID
+        user_login = None
+        for login, acc in accounts.items():
+            if acc.get("uid") == uid:
+                user_login = login
+                break
+        
+        if not user_login:
+            return jsonify({"status": "error"})
+        
+        # Активируем ключ
+        keys_db[key]["used"] = True
+        keys_db[key]["used_by"] = user_login
+        keys_db[key]["used_date"] = datetime.now().strftime("%d.%m.%Y")
+        save(keys_db, KEYS_DB)
+        
+        # Обновляем дату окончания подписки
+        accounts[user_login]["expires"] = keys_db[key].get("expires", "∞")
+        save(accounts, ACCOUNTS)
+        
+        return jsonify({
+            "status": "ok",
+            "expiry": keys_db[key].get("expires", "∞")
         })
 
     # Регистрация
@@ -500,11 +544,11 @@ async def on_message(message):
                           description="\n".join(lines), color=0x5865f2)
         await ch.send(embed=e)
 
-    # !uid loader N ban/unban
+    # !uid loader N ban/unban/выдать ГРУППА
     elif text.startswith("!uid loader "):
         parts = text.split()
         if len(parts) < 4:
-            await ch.send("Использование: `!uid loader 1 ban` или `!uid loader 1 unban`"); return
+            await ch.send("Использование:\n`!uid loader 1 ban`\n`!uid loader 1 unban`\n`!uid loader 1 выдать Beta`"); return
         
         try:
             uid = int(parts[2])
@@ -512,24 +556,53 @@ async def on_message(message):
         except ValueError:
             await ch.send("❌ UID должен быть числом"); return
         
-        if action not in ["ban", "unban"]:
-            await ch.send("❌ Действие: `ban` или `unban`"); return
-        
         accounts = load(ACCOUNTS)
         found = False
+        
         for login, acc in accounts.items():
             if acc.get("uid") == uid:
-                acc["banned"] = (action == "ban")
-                accounts[login] = acc
-                save(accounts, ACCOUNTS)
                 found = True
                 
-                status = "🚫 Заблокирован" if action == "ban" else "✅ Разблокирован"
-                e = discord.Embed(title=f"{status}", color=0xed4245 if action == "ban" else 0x3ba55d)
-                e.add_field(name="UID",   value=f"`{uid}`",   inline=True)
-                e.add_field(name="Логин", value=f"`{login}`", inline=True)
-                e.add_field(name="До",    value=f"`{acc.get('expires','∞')}`", inline=True)
-                await ch.send(embed=e)
+                if action == "ban":
+                    acc["banned"] = True
+                    accounts[login] = acc
+                    save(accounts, ACCOUNTS)
+                    
+                    e = discord.Embed(title="🚫 Заблокирован", color=0xed4245)
+                    e.add_field(name="UID",   value=f"`{uid}`",   inline=True)
+                    e.add_field(name="Логин", value=f"`{login}`", inline=True)
+                    e.add_field(name="До",    value=f"`{acc.get('expires','∞')}`", inline=True)
+                    await ch.send(embed=e)
+                
+                elif action == "unban":
+                    acc["banned"] = False
+                    accounts[login] = acc
+                    save(accounts, ACCOUNTS)
+                    
+                    e = discord.Embed(title="✅ Разблокирован", color=0x3ba55d)
+                    e.add_field(name="UID",   value=f"`{uid}`",   inline=True)
+                    e.add_field(name="Логин", value=f"`{login}`", inline=True)
+                    e.add_field(name="До",    value=f"`{acc.get('expires','∞')}`", inline=True)
+                    await ch.send(embed=e)
+                
+                elif action == "выдать":
+                    if len(parts) < 5:
+                        await ch.send("❌ Укажите группу: `!uid loader 1 выдать Beta`"); return
+                    
+                    group = " ".join(parts[4:])
+                    acc["group"] = group
+                    accounts[login] = acc
+                    save(accounts, ACCOUNTS)
+                    
+                    e = discord.Embed(title="✅ Группа выдана", color=0x3ba55d)
+                    e.add_field(name="UID",    value=f"`{uid}`",   inline=True)
+                    e.add_field(name="Логин",  value=f"`{login}`", inline=True)
+                    e.add_field(name="Группа", value=f"`{group}`", inline=True)
+                    await ch.send(embed=e)
+                
+                else:
+                    await ch.send("❌ Действие: `ban`, `unban` или `выдать ГРУППА`")
+                
                 break
         
         if not found:
@@ -589,3 +662,4 @@ if __name__ == "__main__":
         import time
         while True:
             time.sleep(60)
+
