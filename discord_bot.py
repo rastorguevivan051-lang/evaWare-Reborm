@@ -396,7 +396,8 @@ async def on_message(message):
             "`!reg loader 25.05.2026 nickname` — создать аккаунт\n"
             "`!loader users` — список пользователей\n"
             "`!uid loader 1 ban` — забанить\n"
-            "`!uid loader 1 unban` — разбанить\n\n"
+            "`!uid loader 1 unban` — разбанить\n"
+            "`!uid loader 1 выдать Beta` — выдать группу\n\n"
             "**Команды ключей:**\n"
             "`!key 25.05.2026` — создать ключ\n"
             "`!keys` — список ключей\n\n"
@@ -539,7 +540,8 @@ async def on_message(message):
         for login, acc in list(accounts.items())[:20]:
             em = "🚫" if acc.get("banned") else "✅"
             exp = acc.get("expires", "∞")
-            lines.append(f"{em} **UID {acc.get('uid',0)}** — `{login}` | До: `{exp}`")
+            grp = acc.get("group", "Пользователь")
+            lines.append(f"{em} **UID {acc.get('uid',0)}** — `{login}` | Группа: `{grp}` | До: `{exp}`")
         e = discord.Embed(title=f"👥 Пользователи лоудера ({len(accounts)})",
                           description="\n".join(lines), color=0x5865f2)
         await ch.send(embed=e)
