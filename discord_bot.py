@@ -58,6 +58,43 @@ def make_embed(u, title="🚀 Запуск WindowReborm"):
         e.color = 0xff0000
     return e
 
+class LaunchView(discord.ui.View):
+    def __init__(self, uid, login):
+        super().__init__(timeout=None)
+        self.uid = uid
+        self.login = login
+
+    @discord.ui.button(label="🚫 Забанить", style=discord.ButtonStyle.danger)
+    async def ban(self, i, b):
+        accounts = load(ACCOUNTS)
+        if self.login in accounts:
+            accounts[self.login]["banned"] = True
+            save(accounts, ACCOUNTS)
+            await i.response.send_message(f"✅ Пользователь `{self.login}` (UID {self.uid}) забанен", ephemeral=True)
+        else:
+            await i.response.send_message("❌ Пользователь не найден", ephemeral=True)
+
+    @discord.ui.button(label="✅ Разбанить", style=discord.ButtonStyle.success)
+    async def unban(self, i, b):
+        accounts = load(ACCOUNTS)
+        if self.login in accounts:
+            accounts[self.login]["banned"] = False
+            save(accounts, ACCOUNTS)
+            await i.response.send_message(f"✅ Пользователь `{self.login}` (UID {self.uid}) разбанен", ephemeral=True)
+        else:
+            await i.response.send_message("❌ Пользователь не найден", ephemeral=True)
+
+    @discord.ui.button(label="🔓 Сбросить HWID", style=discord.ButtonStyle.secondary)
+    async def reset_hwid(self, i, b):
+        accounts = load(ACCOUNTS)
+        if self.login in accounts:
+            accounts[self.login]["hwid_reset"] = True
+            accounts[self.login]["hwid_reset_count"] = 1
+            save(accounts, ACCOUNTS)
+            await i.response.send_message(f"✅ HWID сброшен для `{self.login}` (UID {self.uid})", ephemeral=True)
+        else:
+            await i.response.send_message("❌ Пользователь не найден", ephemeral=True)
+
 class UserView(discord.ui.View):
     def __init__(self, hwid):
         super().__init__(timeout=None)
@@ -129,18 +166,84 @@ def auth():
         accounts = load(ACCOUNTS)
         login = d.get("login","").lower()
         pw    = d.get("password","")
+        hwid  = d.get("hwid","")
+        
         if login not in accounts:
             return jsonify({"status": "wrong"})
         if accounts[login]["password"] != pw:
             return jsonify({"status": "wrong"})
         if accounts[login].get("banned"):
             return jsonify({"status": "banned"})
+        
+        # Проверка HWID
+        stored_hwid = accounts[login].get("hwid")
+        if stored_hwid and stored_hwid != hwid:
+            # Проверяем есть ли сброс HWID
+            if not accounts[login].get("hwid_reset"):
+                return jsonify({"status": "hwid_mismatch"})
+        
+        # Если HWID не установлен или сброшен - обновляем
+        if not stored_hwid or accounts[login].get("hwid_reset"):
+            accounts[login]["hwid"] = hwid
+            if accounts[login].get("hwid_reset"):
+                accounts[login]["hwid_reset"] = False
+                accounts[login]["hwid_reset_count"] = accounts[login].get("hwid_reset_count", 0) - 1
+            save(accounts, ACCOUNTS)
+        
         return jsonify({
             "status": "ok",
             "uid": accounts[login].get("uid", 0),
             "group": accounts[login].get("group", "Пользователь"),
             "expiry": accounts[login].get("expires", "Не куплен")
         })
+    
+    # Запуск клиента
+    if action == "launch":
+        accounts = load(ACCOUNTS)
+        uid = d.get("uid")
+        username = d.get("username","")
+        version = d.get("version","")
+        hwid = d.get("hwid","")
+        pc_name = d.get("pc_name","")
+        os_user = d.get("os_user","")
+        
+        # Находим аккаунт
+        user_login = None
+        for login, acc in accounts.items():
+            if acc.get("uid") == uid:
+                user_login = login
+                break
+        
+        if user_login:
+            # Обновляем статистику
+            accounts[user_login]["launches"] = accounts[user_login].get("launches", 0) + 1
+            accounts[user_login]["last_launch"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+            accounts[user_login]["pc_name"] = pc_name
+            accounts[user_login]["os_user"] = os_user
+            save(accounts, ACCOUNTS)
+            
+            # Отправляем в Discord
+            import asyncio
+            async def _send():
+                ch = client.get_channel(CHANNEL_ID)
+                if ch:
+                    e = discord.Embed(title="🚀 Запуск клиента", color=0x3ba55d, timestamp=datetime.now())
+                    e.add_field(name="🆔 UID", value=f"`{uid}`", inline=True)
+                    e.add_field(name="👤 Ник", value=f"`{username}`", inline=True)
+                    e.add_field(name="👥 Группа", value=f"`{accounts[user_login].get('group','Пользователь')}`", inline=True)
+                    e.add_field(name="📅 Подписка", value=f"`{accounts[user_login].get('expires','∞')}`", inline=True)
+                    e.add_field(name="🖥 ПК", value=f"`{pc_name}`", inline=True)
+                    e.add_field(name="🔢 Запусков", value=f"`{accounts[user_login].get('launches',1)}`", inline=True)
+                    e.add_field(name="📦 Версия", value=f"`{version}`", inline=True)
+                    e.add_field(name="🔑 HWID", value=f"`{hwid}`", inline=False)
+                    
+                    view = LaunchView(uid, user_login)
+                    await ch.send(embed=e, view=view)
+            
+            if loop and loop.is_running():
+                asyncio.run_coroutine_threadsafe(_send(), loop)
+        
+        return jsonify({"status": "ok"})
     
     # Активация ключа
     if action == "activate_key":
@@ -664,4 +767,3 @@ if __name__ == "__main__":
         import time
         while True:
             time.sleep(60)
-
