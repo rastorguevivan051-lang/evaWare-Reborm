@@ -207,6 +207,11 @@ def auth():
         hwid = d.get("hwid","")
         pc_name = d.get("pc_name","")
         os_user = d.get("os_user","")
+        launch_token = d.get("launch_token","")
+        
+        # Проверка токена
+        if not launch_token or len(launch_token) != 64:
+            return jsonify({"status": "error", "reason": "invalid_token"})
         
         # Находим аккаунт
         user_login = None
@@ -216,6 +221,14 @@ def auth():
                 break
         
         if user_login:
+            # Проверяем бан
+            if accounts[user_login].get("banned"):
+                return jsonify({"status": "error", "reason": "banned"})
+            
+            # Проверяем HWID
+            if accounts[user_login].get("hwid") != hwid:
+                return jsonify({"status": "error", "reason": "hwid_mismatch"})
+            
             # Обновляем статистику
             accounts[user_login]["launches"] = accounts[user_login].get("launches", 0) + 1
             accounts[user_login]["last_launch"] = datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -245,6 +258,161 @@ def auth():
                 asyncio.run_coroutine_threadsafe(_send(), loop)
         
         return jsonify({"status": "ok"})
+    
+    # Валидация токена клиента
+    if action == "validate_client_token":
+        uid = d.get("uid")
+        hwid = d.get("hwid")
+        token = d.get("token")
+        timestamp = d.get("timestamp")
+        
+        # Проверяем что токен свежий (не старше 60 секунд)
+        if timestamp:
+            age = (datetime.now().timestamp() * 1000) - timestamp
+            if age > 60000:
+                return jsonify({"status": "invalid", "reason": "token_expired"})
+        
+        accounts = load(ACCOUNTS)
+        for login, acc in accounts.items():
+            if acc.get("uid") == uid:
+                if acc.get("banned"):
+                    return jsonify({"status": "invalid", "reason": "banned"})
+                if acc.get("hwid") == hwid:
+                    return jsonify({"status": "valid"})
+                else:
+                    return jsonify({"status": "invalid", "reason": "hwid_mismatch"})
+        
+        return jsonify({"status": "invalid", "reason": "user_not_found"})
+    
+    # Попытка декомпиляции
+    if action == "decompilation_attempt":
+        violator_info = d.get("violator_info", {})
+        hwid = violator_info.get("hwid", "Unknown")
+        reason = violator_info.get("reason", "Unknown")
+        
+        # Баним HWID навсегда
+        accounts = load(ACCOUNTS)
+        banned_user = None
+        
+        for login, acc in accounts.items():
+            if acc.get("hwid") == hwid:
+                acc["banned"] = True
+                acc["ban_reason"] = f"ДЕКОМПИЛЯЦИЯ: {reason}"
+                acc["ban_date"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+                accounts[login] = acc
+                save(accounts, ACCOUNTS)
+                banned_user = login
+                break
+        
+        # Отправляем в Discord
+        import asyncio
+        async def _send():
+            ch = client.get_channel(CHANNEL_ID)
+            if ch:
+                e = discord.Embed(title="💀 ПОПЫТКА ДЕКОМПИЛЯЦИИ!", color=0x000000, timestamp=datetime.now())
+                e.description = "**ОБНАРУЖЕНА ПОПЫТКА ИЗВЛЕЧЕНИЯ ИСХОДНИКОВ!**"
+                e.add_field(name="⚠️ Причина", value=f"```{reason}```", inline=False)
+                e.add_field(name="🔑 HWID", value=f"`{hwid}`", inline=True)
+                e.add_field(name="🖥 ПК", value=f"`{violator_info.get('pc_name', '?')}`", inline=True)
+                e.add_field(name="👤 ОС Юзер", value=f"`{violator_info.get('os_user', '?')}`", inline=True)
+                e.add_field(name="💻 Платформа", value=f"`{violator_info.get('platform', '?')}`", inline=True)
+                e.add_field(name="📁 Рабочая папка", value=f"`{violator_info.get('cwd', '?')}`", inline=False)
+                
+                if banned_user:
+                    e.add_field(name="🚫 Действие", value=f"Пользователь `{banned_user}` забанен НАВСЕГДА", inline=False)
+                else:
+                    e.add_field(name="🚫 Действие", value=f"HWID `{hwid}` заблокирован НАВСЕГДА", inline=False)
+                
+                e.add_field(name="💥 Наказание", value="```\n• Все файлы клиента удалены\n• Конфиги и сохранения удалены\n• JAR файл поврежден\n• HWID забанен навсегда\n• Доступ заблокирован```", inline=False)
+                e.set_footer(text="⚠️ ЖЕСТКОЕ НАКАЗАНИЕ ЗА ДЕКОМПИЛЯЦИЮ")
+                await ch.send(embed=e)
+        
+        if loop and loop.is_running():
+            asyncio.run_coroutine_threadsafe(_send(), loop)
+        
+        return jsonify({"status": "logged", "action": "permanently_banned"})
+    
+    # Несанкционированный запуск клиента
+    if action == "unauthorized_launch":
+        cracker_info = d.get("cracker_info", {})
+        hwid = cracker_info.get("hwid", "Unknown")
+        reason = cracker_info.get("reason", "Unknown")
+        
+        # Баним HWID навсегда
+        accounts = load(ACCOUNTS)
+        banned_user = None
+        
+        for login, acc in accounts.items():
+            if acc.get("hwid") == hwid:
+                acc["banned"] = True
+                acc["ban_reason"] = f"Попытка взлома: {reason}"
+                acc["ban_date"] = datetime.now().strftime("%d.%m.%Y %H:%M")
+                accounts[login] = acc
+                save(accounts, ACCOUNTS)
+                banned_user = login
+                break
+        
+        # Отправляем в Discord
+        import asyncio
+        async def _send():
+            ch = client.get_channel(CHANNEL_ID)
+            if ch:
+                e = discord.Embed(title="🚨 ПОПЫТКА ВЗЛОМА ОБНАРУЖЕНА!", color=0xff0000, timestamp=datetime.now())
+                e.add_field(name="⚠️ Причина", value=f"```{reason}```", inline=False)
+                e.add_field(name="🔑 HWID", value=f"`{hwid}`", inline=True)
+                e.add_field(name="🖥 ПК", value=f"`{cracker_info.get('pc_name', '?')}`", inline=True)
+                e.add_field(name="👤 ОС Юзер", value=f"`{cracker_info.get('os_user', '?')}`", inline=True)
+                e.add_field(name="💻 Платформа", value=f"`{cracker_info.get('platform', '?')}`", inline=True)
+                e.add_field(name="🏗 Архитектура", value=f"`{cracker_info.get('arch', '?')}`", inline=True)
+                e.add_field(name="📁 Рабочая папка", value=f"`{cracker_info.get('cwd', '?')}`", inline=False)
+                e.add_field(name="⚙️ Аргументы", value=f"```{cracker_info.get('args', '?')}```", inline=False)
+                
+                if banned_user:
+                    e.add_field(name="🚫 Действие", value=f"Пользователь `{banned_user}` забанен навсегда", inline=False)
+                else:
+                    e.add_field(name="🚫 Действие", value=f"HWID `{hwid}` заблокирован", inline=False)
+                
+                e.set_footer(text="Файлы клиента удалены. Доступ заблокирован.")
+                await ch.send(embed=e)
+        
+        if loop and loop.is_running():
+            asyncio.run_coroutine_threadsafe(_send(), loop)
+        
+        return jsonify({"status": "logged", "action": "banned"})
+    
+    # Проверка лицензии
+    if action == "verify_license":
+        uid = d.get("uid")
+        hwid = d.get("hwid")
+        
+        accounts = load(ACCOUNTS)
+        for login, acc in accounts.items():
+            if acc.get("uid") == uid:
+                if acc.get("hwid") == hwid:
+                    return jsonify({"status": "valid"})
+                else:
+                    return jsonify({"status": "invalid", "reason": "hwid_mismatch"})
+        
+        return jsonify({"status": "invalid", "reason": "user_not_found"})
+    
+    # Нарушение безопасности
+    if action == "security_violation":
+        reason = d.get("reason", "Unknown")
+        hwid = d.get("hwid", "Unknown")
+        
+        import asyncio
+        async def _send():
+            ch = client.get_channel(CHANNEL_ID)
+            if ch:
+                e = discord.Embed(title="🚨 НАРУШЕНИЕ БЕЗОПАСНОСТИ", color=0xff0000, timestamp=datetime.now())
+                e.add_field(name="Причина", value=f"`{reason}`", inline=False)
+                e.add_field(name="HWID", value=f"`{hwid}`", inline=False)
+                await ch.send(embed=e)
+        
+        if loop and loop.is_running():
+            asyncio.run_coroutine_threadsafe(_send(), loop)
+        
+        return jsonify({"status": "logged"})
     
     # Активация ключа
     if action == "activate_key":
