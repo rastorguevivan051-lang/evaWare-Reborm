@@ -79,8 +79,9 @@ class LaunchView(discord.ui.View):
         accounts = load(ACCOUNTS)
         if self.login in accounts:
             accounts[self.login]["banned"] = False
+            accounts[self.login]["whitelisted"] = True  # Добавляем в белый список
             save(accounts, ACCOUNTS)
-            await i.response.send_message(f"✅ Пользователь `{self.login}` (UID {self.uid}) разбанен", ephemeral=True)
+            await i.response.send_message(f"✅ Пользователь `{self.login}` (UID {self.uid}) разбанен и добавлен в белый список", ephemeral=True)
         else:
             await i.response.send_message("❌ Пользователь не найден", ephemeral=True)
 
@@ -278,7 +279,9 @@ def auth():
                 if acc.get("banned"):
                     return jsonify({"status": "invalid", "reason": "banned"})
                 if acc.get("hwid") == hwid:
-                    return jsonify({"status": "valid"})
+                    # Проверяем белый список
+                    whitelisted = acc.get("whitelisted", False)
+                    return jsonify({"status": "valid", "whitelisted": whitelisted})
                 else:
                     return jsonify({"status": "invalid", "reason": "hwid_mismatch"})
         
