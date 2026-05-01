@@ -194,7 +194,8 @@ def auth():
             "status": "ok",
             "uid": accounts[login].get("uid", 0),
             "group": accounts[login].get("group", "Пользователь"),
-            "expiry": accounts[login].get("expires", "Не куплен")
+            "expiry": accounts[login].get("expires", "Не куплен"),
+            "banned": accounts[login].get("banned", False)
         })
     
     # Запуск клиента
@@ -767,3 +768,4 @@ if __name__ == "__main__":
         import time
         while True:
             time.sleep(60)
+
