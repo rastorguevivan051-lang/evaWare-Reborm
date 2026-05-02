@@ -176,20 +176,27 @@ def auth():
         if accounts[login].get("banned"):
             return jsonify({"status": "banned"})
         
-        # Проверка HWID
+        # Проверка HWID - для новых аккаунтов устанавливаем автоматически
         stored_hwid = accounts[login].get("hwid")
-        if stored_hwid and stored_hwid != hwid:
-            # Проверяем есть ли сброс HWID
-            if not accounts[login].get("hwid_reset"):
-                return jsonify({"status": "hwid_mismatch"})
         
-        # Если HWID не установлен или сброшен - обновляем
-        if not stored_hwid or accounts[login].get("hwid_reset"):
+        # Если HWID не установлен (новый аккаунт) - устанавливаем текущий
+        if not stored_hwid:
             accounts[login]["hwid"] = hwid
+            save(accounts, ACCOUNTS)
+            print(f"[AUTH] Установлен HWID для нового аккаунта {login}: {hwid}")
+        
+        # Если HWID установлен, но не совпадает - проверяем сброс
+        elif stored_hwid != hwid:
             if accounts[login].get("hwid_reset"):
+                # Сброс разрешен - обновляем HWID
+                accounts[login]["hwid"] = hwid
                 accounts[login]["hwid_reset"] = False
                 accounts[login]["hwid_reset_count"] = accounts[login].get("hwid_reset_count", 0) - 1
-            save(accounts, ACCOUNTS)
+                save(accounts, ACCOUNTS)
+                print(f"[AUTH] HWID сброшен для {login}: {stored_hwid} -> {hwid}")
+            else:
+                # Сброс не разрешен - блокируем
+                return jsonify({"status": "hwid_mismatch"})
         
         return jsonify({
             "status": "ok",
