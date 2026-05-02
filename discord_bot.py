@@ -274,6 +274,11 @@ def auth():
         token = d.get("token")
         timestamp = d.get("timestamp")
         
+        # СПЕЦИАЛЬНАЯ ПРОВЕРКА ДЛЯ РАЗРАБОТЧИКА (UID 1)
+        if uid == 1:
+            print(f"[AUTH] РЕЖИМ РАЗРАБОТЧИКА - пропуск всех проверок для UID 1")
+            return jsonify({"status": "valid", "whitelisted": True})
+        
         # Проверяем что токен свежий (не старше 60 секунд)
         if timestamp:
             age = (datetime.now().timestamp() * 1000) - timestamp
@@ -394,6 +399,11 @@ def auth():
     if action == "verify_license":
         uid = d.get("uid")
         hwid = d.get("hwid")
+        
+        # СПЕЦИАЛЬНАЯ ПРОВЕРКА ДЛЯ РАЗРАБОТЧИКА (UID 1)
+        if uid == 1:
+            print(f"[AUTH] РЕЖИМ РАЗРАБОТЧИКА - лицензия всегда валидна для UID 1")
+            return jsonify({"status": "valid"})
         
         accounts = load(ACCOUNTS)
         for login, acc in accounts.items():
