@@ -821,11 +821,11 @@ async def on_message(message):
                           description="\n".join(lines), color=0x5865f2)
         await ch.send(embed=e)
 
-    # !uid loader N ban/unban/выдать ГРУППА
+    # !uid loader N ban/unban/выдать ГРУППА/сбросить hwid
     elif text.startswith("!uid loader "):
         parts = text.split()
         if len(parts) < 4:
-            await ch.send("Использование:\n`!uid loader 1 ban`\n`!uid loader 1 unban`\n`!uid loader 1 выдать Beta`"); return
+            await ch.send("Использование:\n`!uid loader 1 ban`\n`!uid loader 1 unban`\n`!uid loader 1 выдать Beta`\n`!uid loader 1 сбросить hwid`"); return
         
         try:
             uid = int(parts[2])
@@ -880,8 +880,23 @@ async def on_message(message):
                     e.add_field(name="Статус", value="Добавлен в белый список", inline=True)
                     await ch.send(embed=e)
                 
+                elif action == "сбросить" and len(parts) >= 5 and parts[4].lower() == "hwid":
+                    old_hwid = acc.get("hwid", "Не установлен")
+                    acc["hwid_reset"] = True
+                    acc["hwid_reset_count"] = 1
+                    acc["hwid"] = None  # Сбрасываем HWID
+                    accounts[login] = acc
+                    save(accounts, ACCOUNTS)
+                    
+                    e = discord.Embed(title="🔓 HWID сброшен", color=0xffa500)
+                    e.add_field(name="UID",      value=f"`{uid}`",      inline=True)
+                    e.add_field(name="Логин",    value=f"`{login}`",    inline=True)
+                    e.add_field(name="Старый HWID", value=f"`{old_hwid}`", inline=False)
+                    e.add_field(name="Статус",   value="HWID сброшен, пользователь может войти с новым железом", inline=False)
+                    await ch.send(embed=e)
+                
                 else:
-                    await ch.send("❌ Действие: `ban`, `unban` или `выдать ГРУППА`")
+                    await ch.send("❌ Действие: `ban`, `unban`, `выдать ГРУППА` или `сбросить hwid`")
                 
                 break
         
