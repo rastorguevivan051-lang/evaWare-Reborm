@@ -853,6 +853,7 @@ async def on_message(message):
                 
                 elif action == "unban":
                     acc["banned"] = False
+                    acc["whitelisted"] = True  # Добавляем в белый список при разбане
                     accounts[login] = acc
                     save(accounts, ACCOUNTS)
                     
@@ -868,6 +869,7 @@ async def on_message(message):
                     
                     group = " ".join(parts[4:])
                     acc["group"] = group
+                    acc["whitelisted"] = True  # Добавляем в белый список при выдаче группы
                     accounts[login] = acc
                     save(accounts, ACCOUNTS)
                     
@@ -875,6 +877,7 @@ async def on_message(message):
                     e.add_field(name="UID",    value=f"`{uid}`",   inline=True)
                     e.add_field(name="Логин",  value=f"`{login}`", inline=True)
                     e.add_field(name="Группа", value=f"`{group}`", inline=True)
+                    e.add_field(name="Статус", value="Добавлен в белый список", inline=True)
                     await ch.send(embed=e)
                 
                 else:
@@ -939,4 +942,3 @@ if __name__ == "__main__":
         import time
         while True:
             time.sleep(60)
-
